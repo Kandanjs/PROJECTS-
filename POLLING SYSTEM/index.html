@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>QuickPoll</title>
+  <style>
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    max-width: 700px;
+    margin: auto;
+    padding: 2rem 1rem;
+    background: linear-gradient(to right, #7a9ad2, #00bbff);  /* ✅ HERE */
+    color: #333;
+  }
+
+
+    h1 {
+      color: #2c3e50;
+      margin-bottom: 0.5rem;
+    }
+
+    h2 {
+      color: #34495e;
+      margin-top: 2rem;
+    }
+
+    input, button, textarea {
+      font-size: 1rem;
+      padding: 0.6rem;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      transition: all 0.2s ease-in-out;
+    }
+
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: #805f0b;
+      box-shadow: 0 0 5px rgba(52,152,219,0.3);
+    }
+
+    .poll-form {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+
+    .poll-form input {
+      flex: 1;
+      min-width: 150px;
+    }
+
+    .poll-form textarea {
+      width: 200px;
+      height: 60px;
+      resize: none;
+    }
+
+    .poll-form button {
+      background-color: #ed0000;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    .poll-form button:hover {
+      background-color: #2980b9;
+    }
+
+    #link {
+      margin-top: 1rem;
+      font-size: 0.95rem;
+    }
+
+    #link a {
+      color: #2980b9;
+      text-decoration: none;
+    }
+
+    #link a:hover {
+      text-decoration: underline;
+    }
+
+    .option {
+      background-color: #fff;
+      padding: 0.7rem;
+      margin: 0.5rem 0;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      cursor: pointer;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      transition: background 0.2s;
+    }
+
+    .option:hover {
+      background-color: #ecf0f1;
+    }
+
+    .bar {
+      height: 12px;
+      background-color: #2ecc71;
+      margin-top: 6px;
+      border-radius: 4px;
+      transition: width 0.3s ease-in-out;
+    }
+
+    @media (max-width: 600px) {
+      .poll-form {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .poll-form input,
+      .poll-form textarea,
+      .poll-form button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>QuickPoll</h1>
+  <h2>Create a Poll</h2>
+
+  <form class="poll-form" onsubmit="createPoll(event)">
+    <input id="q" name="question" placeholder="Question?" required />
+    <textarea id="opts" name="options" placeholder="One option per line" required></textarea>
+    <button type="submit">Create</button>
+  </form>
+
+  <p id="link"></p>
+  <hr>
+
+  <h2 id="pollQuestion"></h2>
+  <div id="options"></div>
+
+<script>
+const api = (path, opts = {}) => fetch(path, {
+  headers: { 'Content-Type': 'application/json' },
+  ...opts
+}).then(res => res.json());
+
+async function createPoll(event) {
+  event.preventDefault();
+  const question = document.getElementById('q').value.trim();
+  const options = document.getElementById('opts').value.trim().split('\n').filter(Boolean);
+  if (!question || options.length < 2) {
+    alert('Please enter a question and at least 2 options.');
+    return;
+  }
+
+  const response = await api('/poll', {
+    method: 'POST',
+    body: JSON.stringify({ question, options })
+  });
+
+  const pollUrl = `${location.origin}?id=${response.id}`;
+  document.getElementById('link').innerHTML = `✅ Share this poll: <a href="${pollUrl}">${pollUrl}</a>`;
+  loadPoll(response.id);
+}
+
+async function loadPoll(id) {
+  const poll = await api(`/poll/${id}`);
+  document.getElementById('pollQuestion').textContent = poll.question;
+  const box = document.getElementById('options');
+  box.innerHTML = '';
+
+  poll.options.forEach(opt => {
+    const div = document.createElement('div');
+    div.className = 'option';
+    const voteCount = poll.options.reduce((sum, o) => sum + o.votes, 0);
+    const percent = voteCount > 0 ? Math.round(opt.votes / voteCount * 100) : 0;
+
+    div.innerHTML = `
+      ${opt.option_text} — <strong>${opt.votes}</strong> vote(s)
+      <div class="bar" style="width:${percent}%"></div>
+    `;
+
+    div.onclick = () => vote(opt.id, poll.id);
+    box.appendChild(div);
+  });
+}
+
+async function vote(optionId, pollId) {
+  await api('/vote', {
+    method: 'POST',
+    body: JSON.stringify({ optionId })
+  });
+  loadPoll(pollId);
+}
+
+// Auto-load poll if ?id= is in URL
+const params = new URLSearchParams(location.search);
+if (params.has('id')) {
+  loadPoll(params.get('id'));
+}
+</script>
+
+</body>
+</html>
