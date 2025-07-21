@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Focus Task Timer</title>
+</head>
+<body>
+  <h2>Task Focus Timer</h2>
+  <input id="taskName" placeholder="Task name" />
+  <button onclick="startTask()">Start Task</button>
+  <h3 id="timer"></h3>
+
+  <h4>Completed Tasks</h4>
+  <ul id="taskList"></ul>
+
+  <script>
+    let countdown;
+    async function startTask() {
+      const name = document.getElementById("taskName").value;
+      await fetch("http://localhost:3000/task", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, duration: 25 })
+      });
+
+      let time = 25 * 60;
+      countdown = setInterval(() => {
+        let mins = Math.floor(time / 60);
+        let secs = time % 60;
+        document.getElementById("timer").innerText = `${mins}:${secs}`;
+        if (--time < 0) {
+          clearInterval(countdown);
+          completeTask(name);
+        }
+      }, 1000);
+    }
+
+    async function completeTask(name) {
+      await fetch("http://localhost:3000/task/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name })
+      });
+      loadTasks();
+    }
+
+    async function loadTasks() {
+      const res = await fetch("http://localhost:3000/tasks");
+      const data = await res.json();
+      const list = document.getElementById("taskList");
+      list.innerHTML = "";
+      data.filter(t => t.completed).forEach(task => {
+        const li = document.createElement("li");
+        li.innerText = `${task.name} - ${Math.round(task.timeSpent)}s`;
+        list.appendChild(li);
+      });
+    }
+
+    loadTasks();
+  </script>
+</body>
+</html>
